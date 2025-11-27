@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import formidable from 'formidable';
-import html_to_pdf from 'html-pdf-node';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const config = {
   api: {
@@ -8,103 +9,114 @@ export const config = {
   },
 };
 
-// Configuração do PDF
-const pdfOptions = { format: 'A4', printBackground: true };
-
-// Função para gerar o HTML do PDF (Formato Documento)
-const generatePDFHtml = (fields, tableRows) => {
+// Função que gera o Buffer do PDF usando jsPDF
+// Função corrigida para usar autoTable como função direta
+const generatePDFBuffer = (fields, tableRows) => {
+    const doc = new jsPDF();
     const dataSolicitacao = new Date().toLocaleDateString('pt-BR');
+
+    // --- CABEÇALHO ---
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("SOLICITAÇÃO DE ATIVO FIXO", 105, 20, { align: "center" });
     
-    return `
-    <html>
-    <head>
-        <style>
-            body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-            h1 { text-align: center; color: #000; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            .header-info { margin-bottom: 30px; }
-            .header-info p { margin: 5px 0; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
-            th, td { border: 1px solid #333; padding: 8px; text-align: center; }
-            th { background-color: #f0f0f0; }
-            .obs-box { border: 1px solid #333; padding: 10px; min-height: 60px; margin-bottom: 20px; font-size: 12px;}
-            
-            /* Estilo da área de assinatura */
-            .signature-section { margin-top: 60px; display: flex; justify-content: space-between; }
-            .sign-box { width: 45%; text-align: center; }
-            .sign-line { border-top: 1px solid #000; margin-bottom: 5px; }
-            .sign-name { font-weight: bold; text-transform: uppercase; font-size: 12px; }
-            .sign-role { font-size: 11px; color: #555; }
-            
-            .urgency { font-weight: bold; margin-bottom: 20px; color: #000; }
-        </style>
-    </head>
-    <body>
-        <h1>SOLICITAÇÃO DE ATIVO FIXO</h1>
-        
-        <div class="header-info">
-            <p><strong>Solicitante:</strong> ${fields.nome}</p>
-            <p><strong>Setor:</strong> ${fields.setor}</p>
-            <p><strong>Data da Solicitação:</strong> ${dataSolicitacao}</p>
-        </div>
+    doc.setLineWidth(0.5);
+    doc.line(20, 25, 190, 25); 
 
-        <table>
-            <thead>
-                <tr>
-                    <th style="text-align: left;">BEM (Descrição)</th>
-                    <th>PATRIMÔNIO</th>
-                    <th>TIPO</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRows.map(row => `
-                    <tr>
-                        <td style="text-align: left;">${row.bem}</td>
-                        <td>${row.patrimonio || '---'}</td>
-                        <td>${row.tipo}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
+    // --- DADOS DO SOLICITANTE ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    
+    let yPos = 40; 
+    
+    doc.text(`Solicitante: ${fields.nome}`, 20, yPos);
+    yPos += 8;
+    doc.text(`Setor: ${fields.setor}`, 20, yPos);
+    yPos += 8;
+    doc.text(`Data da Solicitação: ${dataSolicitacao}`, 20, yPos);
+    
+    // --- TABELA DE ITENS ---
+    const bodyData = tableRows.map(row => [
+        row.bem,
+        row.patrimonio || '---',
+        row.tipo
+    ]);
 
-        <p><strong>Observações:</strong></p>
-        <div class="obs-box">
-            ${fields.observacao || 'Sem observações.'}
-        </div>
+    // AQUI ESTÁ A CORREÇÃO PRINCIPAL:
+    // Em vez de doc.autoTable, usamos autoTable(doc, options)
+    autoTable(doc, {
+        startY: yPos + 10,
+        head: [['BEM (Descrição)', 'PATRIMÔNIO', 'TIPO']],
+        body: bodyData,
+        theme: 'grid',
+        headStyles: { fillColor: [220, 220, 220], textColor: 20, lineColor: 0 },
+        styles: { fontSize: 10, cellPadding: 3 },
+    });
 
-        <p class="urgency">NÍVEL DE URGÊNCIA: ${fields.urgencia.toUpperCase()}</p>
+    // Pega a posição onde a tabela terminou
+    let finalY = doc.lastAutoTable.finalY + 15;
 
-        <div class="signature-section">
-            <div style="width: 100%; display: flex; justify-content: space-between;">
-                
-                <div class="sign-box">
-                    <div class="sign-line"></div>
-                    <div class="sign-name">${fields.nome}</div>
-                    <div class="sign-role">Solicitante</div>
-                    <div class="sign-role">Data: ${dataSolicitacao}</div>
-                </div>
+    // --- OBSERVAÇÕES ---
+    doc.setFont("helvetica", "bold");
+    doc.text("Observações:", 20, finalY);
+    finalY += 7;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    
+    const obsText = doc.splitTextToSize(fields.observacao || "Sem observações.", 170);
+    doc.text(obsText, 20, finalY);
+    
+    finalY += (obsText.length * 5) + 10;
 
-                <div class="sign-box">
-                    <div class="sign-line"></div>
-                    <div class="sign-name">Gestão / Aprovação</div>
-                    <div class="sign-role">Assinatura Responsável</div>
-                    <div class="sign-role">Data: ____/____/______</div>
-                </div>
+    // --- URGÊNCIA ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`NÍVEL DE URGÊNCIA: ${fields.urgencia.toUpperCase()}`, 20, finalY);
 
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
+    // --- ASSINATURAS ---
+    if (finalY > 240) {
+        doc.addPage();
+        finalY = 40;
+    } else {
+        finalY += 40; 
+    }
+
+    const pageHeight = doc.internal.pageSize.height;
+    const assinaturaY = finalY > (pageHeight - 40) ? pageHeight - 40 : finalY;
+
+    // Assinatura Esquerda 
+    doc.setLineWidth(0.2);
+    doc.line(20, assinaturaY, 90, assinaturaY); 
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(fields.nome.toUpperCase(), 55, assinaturaY + 5, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("Solicitante", 55, assinaturaY + 10, { align: "center" });
+    doc.text(`Data: ${dataSolicitacao}`, 55, assinaturaY + 15, { align: "center" });
+
+    // Assinatura Direita 
+    doc.line(120, assinaturaY, 190, assinaturaY); 
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("GESTÃO / APROVAÇÃO", 155, assinaturaY + 5, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("Assinatura Responsável", 155, assinaturaY + 10, { align: "center" });
+    doc.text("Data: ___/___/______", 155, assinaturaY + 15, { align: "center" });
+
+    return Buffer.from(doc.output('arraybuffer'));
 };
 
 async function enviarNotificacaoDiscord(fields, tableRows) {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL; // Lembre de mudar se for um canal diferente
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
   if (!webhookUrl) return;
 
   const colorMap = {
-      'Baixa': 0x00FF00,  // Verde
-      'Média': 0xFFFF00,  // Amarelo
-      'Alta': 0xFF0000    // Vermelho
+      'Baixa': 0x00FF00,
+      'Média': 0xFFFF00,
+      'Alta': 0xFF0000
   };
 
   const itensDescricao = tableRows.map(row => 
@@ -156,7 +168,6 @@ export default async function handler(req, res) {
 
     const getVal = (v) => Array.isArray(v) ? v[0] : v;
     
-    // Processar campos simples
     const dados = {
         nome: getVal(fields.nome),
         setor: getVal(fields.setor),
@@ -164,7 +175,6 @@ export default async function handler(req, res) {
         urgencia: getVal(fields.urgencia),
     };
 
-    // Processar tabela dinâmica
     const tableRows = [];
     const count = parseInt(getVal(fields.row_count) || '0');
     
@@ -174,18 +184,14 @@ export default async function handler(req, res) {
             tableRows.push({
                 bem: bem,
                 patrimonio: getVal(fields[`patrimonio_${i}`]),
-                tipo: getVal(fields[`tipo_${i}`]) // RAF, TAF ou BAF
+                tipo: getVal(fields[`tipo_${i}`])
             });
         }
     }
 
-    // Gerar PDF
-    const htmlContent = generatePDFHtml(dados, tableRows);
-    const file = { content: htmlContent };
-    
-    const pdfBuffer = await html_to_pdf.generatePdf(file, pdfOptions);
+    // --- AQUI MUDA: Chamamos a nova função generatePDFBuffer ---
+    const pdfBuffer = generatePDFBuffer(dados, tableRows);
 
-    // Enviar E-mail
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_SERVER_HOST,
       port: process.env.EMAIL_SERVER_PORT,
@@ -200,7 +206,7 @@ export default async function handler(req, res) {
       from: `"${dados.nome}" <${process.env.EMAIL_FROM}>`,
       to: process.env.EMAIL_TO,
       subject: `Solicitação Ativo Fixo - ${dados.setor}`,
-      text: `Segue em anexo a solicitação de ativo fixo gerada pelo sistema.\nSolicitante: ${dados.nome}\nUrgência: ${dados.urgencia}`,
+      text: `Solicitante: ${dados.nome}\nUrgência: ${dados.urgencia}\n\nO PDF da solicitação segue em anexo.`,
       attachments: [
           {
               filename: `AtivoFixo_${dados.nome.replace(/\s/g, '_')}.pdf`,
