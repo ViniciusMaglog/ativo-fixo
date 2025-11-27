@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import Head from 'next/head'; // Importante para meta tags se necessário
+import Head from 'next/head'; 
 
 export default function AtivoFixoPage() {
   const [status, setStatus] = useState({ submitting: false, success: false, error: '' });
