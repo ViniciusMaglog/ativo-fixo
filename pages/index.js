@@ -102,7 +102,7 @@ export default function AtivoFixoPage() {
 
   return (
     <div className="min-h-screen bg-gray-200 dark:bg-gray-900 p-2 md:p-4 font-sans transition-colors duration-200">
-        <Head><title>Ativo Fixo - Maglog</title></Head>
+        <Head><title>Ativo Fixo - Maglog</title> <link rel="icon" href="/favicon.ico" /></Head>
       
       <div className="w-full max-w-[95%] mx-auto bg-white dark:bg-gray-800 p-4 md:p-8 rounded-lg shadow-xl border-t-8 border-cyan-900 dark:border-cyan-600">
         
