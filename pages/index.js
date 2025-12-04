@@ -116,7 +116,7 @@ export default function AtivoFixoPage() {
         </div>
 
         <h1 className="text-xl md:text-2xl font-bold text-center text-cyan-900 dark:text-cyan-400 mb-6 border-b-2 border-gray-200 dark:border-gray-700 pb-2 uppercase">
-            Solicitação de Ativo Fixo
+            Requisição de Ativo Fixo
         </h1>
         
         <form onSubmit={handleSubmit} className="space-y-6">
