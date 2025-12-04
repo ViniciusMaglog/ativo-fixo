@@ -36,20 +36,32 @@ const generatePDFBuffer = (fields, tableRows) => {
     doc.text(`Data da Solicitação: ${dataSolicitacao}`, 20, yPos);
     
     // --- TABELA DE ITENS ---
-    const bodyData = tableRows.map(row => [
-        row.bem,
-        row.patrimonio || '---',
-        row.tipo,
-        // Nova coluna VAZIA para o Setor a ser preenchido manualmente
-        '' 
-    ]);
+    const bodyData = tableRows.map(row => {
+        // Lógica para preencher a nova coluna 'SETOR'
+        let setorPreenchimento = '';
+        const tipo = row.tipo ? row.tipo.toUpperCase() : '';
+
+        if (tipo === 'RAF' || tipo === 'BAF') {
+            setorPreenchimento = 'N/A';
+        } else if (tipo === 'TAF') {
+            setorPreenchimento = ''; // Deixa em branco para preencher
+        }
+        // Se for outro valor, continua em branco (setorPreenchimento = '')
+
+        return [
+            row.bem,
+            row.patrimonio || '---',
+            row.tipo,
+            setorPreenchimento // Nova coluna preenchida
+        ];
+    });
 
     // AQUI ESTÁ A CORREÇÃO PRINCIPAL:
     // Em vez de doc.autoTable, usamos autoTable(doc, options)
     autoTable(doc, {
         startY: yPos + 10,
         // Novo cabeçalho com a coluna 'SETOR'
-        head: [['BEM (Descrição)', 'PATRIMÔNIO', 'TIPO', 'SETOR']],
+        head: [['BEM (Descrição)', 'PATRIMÔNIO', 'TIPO', 'SETOR DESTINO']],
         body: bodyData,
         theme: 'grid',
         headStyles: { fillColor: [220, 220, 220], textColor: 20, lineColor: 0 },
